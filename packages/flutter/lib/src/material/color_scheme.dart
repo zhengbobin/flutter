@@ -1,4 +1,4 @@
-// Copyright 2018 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -16,7 +16,7 @@ import 'theme_data.dart';
 /// The [Theme] has a color scheme, [ThemeData.colorScheme], which is constructed
 /// with [ColorScheme.fromSwatch].
 @immutable
-class ColorScheme extends Diagnosticable {
+class ColorScheme with Diagnosticable {
   /// Create a ColorScheme instance.
   const ColorScheme({
     @required this.primary,
@@ -76,16 +76,16 @@ class ColorScheme extends Diagnosticable {
        assert(onError != null),
        assert(brightness != null);
 
-  /// Create dark version of the
-  /// [baseline Material color scheme](https://material.io/design/color/the-color-system.html#color-theme-creation).
+  /// Create the recommended dark color scheme that matches the
+  /// [baseline Material color scheme](https://material.io/design/color/dark-theme.html#ui-application).
   const ColorScheme.dark({
     this.primary = const Color(0xffbb86fc),
-    this.primaryVariant = const Color(0xff4b01d0),
+    this.primaryVariant = const Color(0xff3700B3),
     this.secondary = const Color(0xff03dac6),
     this.secondaryVariant = const Color(0xff03dac6),
-    this.surface = Colors.black,
-    this.background = Colors.black,
-    this.error = const Color(0xffb00020),
+    this.surface = const Color(0xff121212),
+    this.background = const Color(0xff121212),
+    this.error = const Color(0xffcf6679),
     this.onPrimary = Colors.black,
     this.onSecondary = Colors.black,
     this.onSurface = Colors.white,
@@ -268,20 +268,20 @@ class ColorScheme extends Diagnosticable {
       return true;
     if (other.runtimeType != runtimeType)
       return false;
-    final ColorScheme otherScheme = other;
-    return otherScheme.primary == primary
-        && otherScheme.primaryVariant == primaryVariant
-        && otherScheme.secondary == secondary
-        && otherScheme.secondaryVariant == secondaryVariant
-        && otherScheme.surface == surface
-        && otherScheme.background == background
-        && otherScheme.error == error
-        && otherScheme.onPrimary == onPrimary
-        && otherScheme.onSecondary == onSecondary
-        && otherScheme.onSurface == onSurface
-        && otherScheme.onBackground == onBackground
-        && otherScheme.onError == onError
-        && otherScheme.brightness == brightness;
+    return other is ColorScheme
+        && other.primary == primary
+        && other.primaryVariant == primaryVariant
+        && other.secondary == secondary
+        && other.secondaryVariant == secondaryVariant
+        && other.surface == surface
+        && other.background == background
+        && other.error == error
+        && other.onPrimary == onPrimary
+        && other.onSecondary == onSecondary
+        && other.onSurface == onSurface
+        && other.onBackground == onBackground
+        && other.onError == onError
+        && other.brightness == brightness;
   }
 
   @override

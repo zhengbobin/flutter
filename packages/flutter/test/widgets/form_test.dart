@@ -1,4 +1,4 @@
-// Copyright 2016 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -11,16 +11,18 @@ void main() {
     String fieldValue;
 
     Widget builder() {
-      return MediaQuery(
-        data: const MediaQueryData(devicePixelRatio: 1.0),
-        child: Directionality(
-          textDirection: TextDirection.ltr,
-          child: Center(
-            child: Material(
-              child: Form(
-                key: formKey,
-                child: TextFormField(
-                  onSaved: (String value) { fieldValue = value; },
+      return MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(devicePixelRatio: 1.0),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: Center(
+              child: Material(
+                child: Form(
+                  key: formKey,
+                  child: TextFormField(
+                    onSaved: (String value) { fieldValue = value; },
+                  ),
                 ),
               ),
             ),
@@ -36,7 +38,7 @@ void main() {
     Future<void> checkText(String testValue) async {
       await tester.enterText(find.byType(TextFormField), testValue);
       formKey.currentState.save();
-      // pump'ing is unnecessary because callback happens regardless of frames
+      // Pumping is unnecessary because callback happens regardless of frames.
       expect(fieldValue, equals(testValue));
     }
 
@@ -48,15 +50,17 @@ void main() {
     String fieldValue;
 
     Widget builder() {
-      return MediaQuery(
-        data: const MediaQueryData(devicePixelRatio: 1.0),
-        child: Directionality(
-          textDirection: TextDirection.ltr,
-          child: Center(
-            child: Material(
-              child: Form(
-                child: TextField(
-                  onChanged: (String value) { fieldValue = value; },
+      return MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(devicePixelRatio: 1.0),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: Center(
+              child: Material(
+                child: Form(
+                  child: TextField(
+                    onChanged: (String value) { fieldValue = value; },
+                  ),
                 ),
               ),
             ),
@@ -84,17 +88,19 @@ void main() {
     String errorText(String value) => value + '/error';
 
     Widget builder(bool autovalidate) {
-      return MediaQuery(
-        data: const MediaQueryData(devicePixelRatio: 1.0),
-        child: Directionality(
-          textDirection: TextDirection.ltr,
-          child: Center(
-            child: Material(
-              child: Form(
-                key: formKey,
-                autovalidate: autovalidate,
-                child: TextFormField(
-                  validator: errorText,
+      return MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(devicePixelRatio: 1.0),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: Center(
+              child: Material(
+                child: Form(
+                  key: formKey,
+                  autovalidate: autovalidate,
+                  child: TextFormField(
+                    validator: errorText,
+                  ),
                 ),
               ),
             ),
@@ -131,6 +137,100 @@ void main() {
     await checkErrorText('');
   });
 
+  testWidgets('isValid returns true when a field is valid', (WidgetTester tester) async {
+    final GlobalKey<FormFieldState<String>> fieldKey1 = GlobalKey<FormFieldState<String>>();
+    final GlobalKey<FormFieldState<String>> fieldKey2 = GlobalKey<FormFieldState<String>>();
+    const String validString = 'Valid string';
+    String validator(String s) => s == validString ? null : 'Error text';
+
+    Widget builder() {
+      return MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(devicePixelRatio: 1.0),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: Center(
+              child: Material(
+                child: Form(
+                  child: ListView(
+                    children: <Widget>[
+                      TextFormField(
+                        key: fieldKey1,
+                        initialValue: validString,
+                        validator: validator,
+                        autovalidate: true
+                      ),
+                      TextFormField(
+                        key: fieldKey2,
+                        initialValue: validString,
+                        validator: validator,
+                        autovalidate: true
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    await tester.pumpWidget(builder());
+
+    expect(fieldKey1.currentState.isValid, isTrue);
+    expect(fieldKey2.currentState.isValid, isTrue);
+  });
+
+  testWidgets(
+    'isValid returns false when the field is invalid and does not change error display',
+    (WidgetTester tester) async {
+      final GlobalKey<FormFieldState<String>> fieldKey1 = GlobalKey<FormFieldState<String>>();
+      final GlobalKey<FormFieldState<String>> fieldKey2 = GlobalKey<FormFieldState<String>>();
+      const String validString = 'Valid string';
+      String validator(String s) => s == validString ? null : 'Error text';
+
+      Widget builder() {
+        return MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(devicePixelRatio: 1.0),
+            child: Directionality(
+              textDirection: TextDirection.ltr,
+              child: Center(
+                child: Material(
+                  child: Form(
+                    child: ListView(
+                      children: <Widget>[
+                        TextFormField(
+                          key: fieldKey1,
+                          initialValue: validString,
+                          validator: validator,
+                          autovalidate: false,
+                        ),
+                        TextFormField(
+                          key: fieldKey2,
+                          initialValue: '',
+                          validator: validator,
+                          autovalidate: false,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+
+      await tester.pumpWidget(builder());
+
+      expect(fieldKey1.currentState.isValid, isTrue);
+      expect(fieldKey2.currentState.isValid, isFalse);
+      expect(fieldKey2.currentState.hasError, isFalse);
+    },
+  );
+
   testWidgets('Multiple TextFormFields communicate', (WidgetTester tester) async {
     final GlobalKey<FormState> formKey = GlobalKey<FormState>();
     final GlobalKey<FormFieldState<String>> fieldKey = GlobalKey<FormFieldState<String>>();
@@ -138,24 +238,26 @@ void main() {
     String errorText(String input) => '${fieldKey.currentState.value}/error';
 
     Widget builder() {
-      return MediaQuery(
-        data: const MediaQueryData(devicePixelRatio: 1.0),
-        child: Directionality(
-          textDirection: TextDirection.ltr,
-          child: Center(
-            child: Material(
-              child: Form(
-                key: formKey,
-                autovalidate: true,
-                child: ListView(
-                  children: <Widget>[
-                    TextFormField(
-                      key: fieldKey,
-                    ),
-                    TextFormField(
-                      validator: errorText,
-                    ),
-                  ],
+      return MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(devicePixelRatio: 1.0),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: Center(
+              child: Material(
+                child: Form(
+                  key: formKey,
+                  autovalidate: true,
+                  child: ListView(
+                    children: <Widget>[
+                      TextFormField(
+                        key: fieldKey,
+                      ),
+                      TextFormField(
+                        validator: errorText,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -184,16 +286,18 @@ void main() {
     final GlobalKey<FormFieldState<String>> inputKey = GlobalKey<FormFieldState<String>>();
 
     Widget builder() {
-      return MediaQuery(
-        data: const MediaQueryData(devicePixelRatio: 1.0),
-        child: Directionality(
-          textDirection: TextDirection.ltr,
-          child: Center(
-            child: Material(
-              child: Form(
-                child: TextFormField(
-                  key: inputKey,
-                  initialValue: 'hello',
+      return MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(devicePixelRatio: 1.0),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: Center(
+              child: Material(
+                child: Form(
+                  child: TextFormField(
+                    key: inputKey,
+                    initialValue: 'hello',
+                  ),
                 ),
               ),
             ),
@@ -227,16 +331,18 @@ void main() {
     final GlobalKey<FormFieldState<String>> inputKey = GlobalKey<FormFieldState<String>>();
 
     Widget builder() {
-      return MediaQuery(
-        data: const MediaQueryData(devicePixelRatio: 1.0),
-        child: Directionality(
-          textDirection: TextDirection.ltr,
-          child: Center(
-            child: Material(
-              child: Form(
-                child: TextFormField(
-                  key: inputKey,
-                  controller: controller,
+      return MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(devicePixelRatio: 1.0),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: Center(
+              child: Material(
+                child: Form(
+                  child: TextFormField(
+                    key: inputKey,
+                    controller: controller,
+                  ),
                 ),
               ),
             ),
@@ -272,18 +378,20 @@ void main() {
     final TextEditingController controller = TextEditingController(text: 'Plover');
 
     Widget builder() {
-      return MediaQuery(
-        data: const MediaQueryData(devicePixelRatio: 1.0),
-        child: Directionality(
-          textDirection: TextDirection.ltr,
-          child: Center(
-            child: Material(
-              child: Form(
-                key: formKey,
-                child: TextFormField(
-                  key: inputKey,
-                  controller: controller,
-                  // initialValue is 'Plover'
+      return MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(devicePixelRatio: 1.0),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: Center(
+              child: Material(
+                child: Form(
+                  key: formKey,
+                  child: TextFormField(
+                    key: inputKey,
+                    controller: controller,
+                    // initialValue is 'Plover'
+                  ),
                 ),
               ),
             ),
@@ -322,16 +430,18 @@ void main() {
       return StatefulBuilder(
         builder: (BuildContext context, StateSetter setter) {
           setState = setter;
-          return MediaQuery(
-            data: const MediaQueryData(devicePixelRatio: 1.0),
-            child: Directionality(
-              textDirection: TextDirection.ltr,
-              child: Center(
-                child: Material(
-                  child: Form(
-                    child: TextFormField(
-                      key: inputKey,
-                      controller: currentController,
+          return MaterialApp(
+            home: MediaQuery(
+              data: const MediaQueryData(devicePixelRatio: 1.0),
+              child: Directionality(
+                textDirection: TextDirection.ltr,
+                child: Center(
+                  child: Material(
+                    child: Form(
+                      child: TextFormField(
+                        key: inputKey,
+                        controller: currentController,
+                      ),
                     ),
                   ),
                 ),
@@ -420,18 +530,20 @@ void main() {
     String fieldValue;
 
     Widget builder(bool remove) {
-      return MediaQuery(
-        data: const MediaQueryData(devicePixelRatio: 1.0),
-        child: Directionality(
-          textDirection: TextDirection.ltr,
-          child: Center(
-            child: Material(
-              child: Form(
-                key: formKey,
-                child: remove ? Container() : TextFormField(
-                  autofocus: true,
-                  onSaved: (String value) { fieldValue = value; },
-                  validator: (String value) { return value.isEmpty ? null : 'yes'; },
+      return MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(devicePixelRatio: 1.0),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: Center(
+              child: Material(
+                child: Form(
+                  key: formKey,
+                  child: remove ? Container() : TextFormField(
+                    autofocus: true,
+                    onSaved: (String value) { fieldValue = value; },
+                    validator: (String value) { return value.isEmpty ? null : 'yes'; },
+                  ),
                 ),
               ),
             ),

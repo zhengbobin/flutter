@@ -1,4 +1,4 @@
-// Copyright 2018 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -65,7 +65,7 @@ import 'theme_data.dart';
 /// {@endtemplate}
 ///
 /// {@template flutter.material.slider.seeAlso.roundSliderTickMarkShape}
-///  * [RoundSliderTickMarkShape], which is the the default [Slider]'s tick mark
+///  * [RoundSliderTickMarkShape], which is the default [Slider]'s tick mark
 ///    shape that paints a solid circle.
 /// {@endtemplate}
 ///
@@ -134,7 +134,7 @@ import 'theme_data.dart';
 /// {@macro flutter.material.slider.seeAlso.rangeSliderValueIndicatorShape}
 /// {@macro flutter.material.slider.seeAlso.rangeSliderTrackShape}
 /// {@macro flutter.material.slider.seeAlso.rangeSliderTickMarkShape}
-class SliderTheme extends InheritedWidget {
+class SliderTheme extends InheritedTheme {
   /// Applies the given theme [data] to [child].
   ///
   /// The [data] and [child] arguments must not be null.
@@ -155,7 +155,7 @@ class SliderTheme extends InheritedWidget {
   /// Defaults to the ambient [ThemeData.sliderTheme] if there is no
   /// [SliderTheme] in the given build context.
   ///
-  /// {@tool sample}
+  /// {@tool snippet}
   ///
   /// ```dart
   /// class Launch extends StatefulWidget {
@@ -185,8 +185,14 @@ class SliderTheme extends InheritedWidget {
   ///  * [SliderThemeData], which describes the actual configuration of a slider
   ///    theme.
   static SliderThemeData of(BuildContext context) {
-    final SliderTheme inheritedTheme = context.inheritFromWidgetOfExactType(SliderTheme);
+    final SliderTheme inheritedTheme = context.dependOnInheritedWidgetOfExactType<SliderTheme>();
     return inheritedTheme != null ? inheritedTheme.data : Theme.of(context).sliderTheme;
+  }
+
+  @override
+  Widget wrap(BuildContext context, Widget child) {
+    final SliderTheme ancestorTheme = context.findAncestorWidgetOfExactType<SliderTheme>();
+    return identical(this, ancestorTheme) ? child : SliderTheme(data: data, child: child);
   }
 
   @override
@@ -299,7 +305,7 @@ enum Thumb {
 /// {@macro flutter.material.slider.seeAlso.rangeSliderValueIndicatorShape}
 /// {@macro flutter.material.slider.seeAlso.rangeSliderTrackShape}
 /// {@macro flutter.material.slider.seeAlso.rangeSliderTickMarkShape}
-class SliderThemeData extends Diagnosticable {
+class SliderThemeData with Diagnosticable {
   /// Create a [SliderThemeData] given a set of exact values. All the values
   /// must be specified.
   ///
@@ -310,7 +316,7 @@ class SliderThemeData extends Diagnosticable {
   /// [copyWith] on the one you get from [SliderTheme.of], or create an
   /// entirely new one with [SliderThemeData.fromPrimaryColors].
   ///
-  /// {@tool sample}
+  /// {@tool snippet}
   ///
   /// ```dart
   /// class Blissful extends StatefulWidget {
@@ -502,7 +508,7 @@ class SliderThemeData extends Diagnosticable {
   ///
   /// See also:
   ///
-  ///  * [RoundRangeSliderTickMarkShape], which is the the default tick mark
+  ///  * [RoundRangeSliderTickMarkShape], which is the default tick mark
   ///    shape for the range slider.
   final SliderTickMarkShape tickMarkShape;
 
@@ -512,7 +518,7 @@ class SliderThemeData extends Diagnosticable {
   ///
   /// See also:
   ///
-  ///  * [RoundRangeSliderThumbShape], which is the the default thumb shape for
+  ///  * [RoundRangeSliderThumbShape], which is the default thumb shape for
   ///    the [RangeSlider].
   final SliderComponentShape thumbShape;
 
@@ -527,7 +533,7 @@ class SliderThemeData extends Diagnosticable {
   ///
   /// See also:
   ///
-  ///  * [RoundedRectRangeSliderTrackShape], which is the the default track
+  ///  * [RoundedRectRangeSliderTrackShape], which is the default track
   ///    shape for the [RangeSlider].
   final SliderTrackShape trackShape;
 
@@ -538,7 +544,7 @@ class SliderThemeData extends Diagnosticable {
   ///
   /// See also:
   ///
-  ///  * [PaddleRangeSliderValueIndicatorShape], which is the the default value
+  ///  * [PaddleRangeSliderValueIndicatorShape], which is the default value
   ///    indicator shape for the [RangeSlider].
   final SliderComponentShape valueIndicatorShape;
 
@@ -552,7 +558,7 @@ class SliderThemeData extends Diagnosticable {
   ///
   /// See also:
   ///
-  ///  * [RoundSliderTickMarkShape], which is the the default tick mark shape
+  ///  * [RoundSliderTickMarkShape], which is the default tick mark shape
   ///    for the [Slider].
   final RangeSliderTickMarkShape rangeTickMarkShape;
 
@@ -566,13 +572,13 @@ class SliderThemeData extends Diagnosticable {
   ///
   /// See also:
   ///
-  ///  * [RoundSliderThumbShape], which is the the default thumb shape for the
+  ///  * [RoundSliderThumbShape], which is the default thumb shape for the
   ///    [Slider].
   final RangeSliderThumbShape rangeThumbShape;
 
   /// The shape that will be used to draw the [RangeSlider]'s track.
   ///
-  /// The [SliderTrackShape.getPreferredRect] method is used to to map
+  /// The [SliderTrackShape.getPreferredRect] method is used to map
   /// slider-relative gesture coordinates to the correct thumb position on the
   /// track. It is also used to horizontally position the tick marks, when the
   /// slider is discrete.
@@ -581,7 +587,7 @@ class SliderThemeData extends Diagnosticable {
   ///
   /// See also:
   ///
-  ///  * [RoundedRectSliderTrackShape], which is the the default track
+  ///  * [RoundedRectSliderTrackShape], which is the default track
   ///    shape for the [Slider].
   final RangeSliderTrackShape rangeTrackShape;
 
@@ -596,7 +602,7 @@ class SliderThemeData extends Diagnosticable {
   ///
   /// See also:
   ///
-  ///  * [PaddleSliderValueIndicatorShape], which is the the default value
+  ///  * [PaddleSliderValueIndicatorShape], which is the default value
   ///    indicator shape for the [Slider].
   final RangeSliderValueIndicatorShape rangeValueIndicatorShape;
 
@@ -609,8 +615,6 @@ class SliderThemeData extends Diagnosticable {
   final ShowValueIndicator showValueIndicator;
 
   /// The text style for the text on the value indicator.
-  ///
-  /// By default this is the [ThemeData.accentTextTheme.body2] text theme.
   final TextStyle valueIndicatorTextStyle;
 
   /// Limits the thumb's separation distance.
@@ -776,34 +780,34 @@ class SliderThemeData extends Diagnosticable {
     if (other.runtimeType != runtimeType) {
       return false;
     }
-    final SliderThemeData otherData = other;
-    return otherData.trackHeight == trackHeight
-      && otherData.activeTrackColor == activeTrackColor
-      && otherData.inactiveTrackColor == inactiveTrackColor
-      && otherData.disabledActiveTrackColor == disabledActiveTrackColor
-      && otherData.disabledInactiveTrackColor == disabledInactiveTrackColor
-      && otherData.activeTickMarkColor == activeTickMarkColor
-      && otherData.inactiveTickMarkColor == inactiveTickMarkColor
-      && otherData.disabledActiveTickMarkColor == disabledActiveTickMarkColor
-      && otherData.disabledInactiveTickMarkColor == disabledInactiveTickMarkColor
-      && otherData.thumbColor == thumbColor
-      && otherData.overlappingShapeStrokeColor == overlappingShapeStrokeColor
-      && otherData.disabledThumbColor == disabledThumbColor
-      && otherData.overlayColor == overlayColor
-      && otherData.valueIndicatorColor == valueIndicatorColor
-      && otherData.overlayShape == overlayShape
-      && otherData.tickMarkShape == tickMarkShape
-      && otherData.thumbShape == thumbShape
-      && otherData.trackShape == trackShape
-      && otherData.valueIndicatorShape == valueIndicatorShape
-      && otherData.rangeTickMarkShape == rangeTickMarkShape
-      && otherData.rangeThumbShape == rangeThumbShape
-      && otherData.rangeTrackShape == rangeTrackShape
-      && otherData.rangeValueIndicatorShape == rangeValueIndicatorShape
-      && otherData.showValueIndicator == showValueIndicator
-      && otherData.valueIndicatorTextStyle == valueIndicatorTextStyle
-      && otherData.minThumbSeparation == minThumbSeparation
-      && otherData.thumbSelector == thumbSelector;
+    return other is SliderThemeData
+        && other.trackHeight == trackHeight
+        && other.activeTrackColor == activeTrackColor
+        && other.inactiveTrackColor == inactiveTrackColor
+        && other.disabledActiveTrackColor == disabledActiveTrackColor
+        && other.disabledInactiveTrackColor == disabledInactiveTrackColor
+        && other.activeTickMarkColor == activeTickMarkColor
+        && other.inactiveTickMarkColor == inactiveTickMarkColor
+        && other.disabledActiveTickMarkColor == disabledActiveTickMarkColor
+        && other.disabledInactiveTickMarkColor == disabledInactiveTickMarkColor
+        && other.thumbColor == thumbColor
+        && other.overlappingShapeStrokeColor == overlappingShapeStrokeColor
+        && other.disabledThumbColor == disabledThumbColor
+        && other.overlayColor == overlayColor
+        && other.valueIndicatorColor == valueIndicatorColor
+        && other.overlayShape == overlayShape
+        && other.tickMarkShape == tickMarkShape
+        && other.thumbShape == thumbShape
+        && other.trackShape == trackShape
+        && other.valueIndicatorShape == valueIndicatorShape
+        && other.rangeTickMarkShape == rangeTickMarkShape
+        && other.rangeThumbShape == rangeThumbShape
+        && other.rangeTrackShape == rangeTrackShape
+        && other.rangeValueIndicatorShape == rangeValueIndicatorShape
+        && other.showValueIndicator == showValueIndicator
+        && other.valueIndicatorTextStyle == valueIndicatorTextStyle
+        && other.minThumbSeparation == minThumbSeparation
+        && other.thumbSelector == thumbSelector;
   }
 
   @override
@@ -1236,6 +1240,19 @@ abstract class RangeSliderValueIndicatorShape {
   /// width because it is derived from a formatted string.
   Size getPreferredSize(bool isEnabled, bool isDiscrete, { TextPainter labelPainter });
 
+  /// Determines the best offset to keep this shape on the screen.
+  ///
+  /// Override this method when the center of the value indicator should be
+  /// shifted from the vertical center of the thumb.
+  double getHorizontalShift({
+    RenderBox parentBox,
+    Offset center,
+    TextPainter labelPainter,
+    Animation<double> activationAnimation,
+  }) {
+    return 0;
+  }
+
   /// Paints the value indicator shape based on the state passed to it.
   ///
   /// {@macro flutter.material.rangeSlider.shape.context}
@@ -1429,16 +1446,16 @@ abstract class RangeSliderTrackShape {
 /// Base track shape that provides an implementation of [getPreferredRect] for
 /// default sizing.
 ///
+/// The height is set from [SliderThemeData.trackHeight] and the width of the
+/// parent box less the larger of the widths of [SliderThemeData.thumbShape] and
+/// [SliderThemeData.overlayShape].
+///
 /// See also:
 ///
 ///  * [RectangularSliderTrackShape], which is a track shape with sharp
 ///    rectangular edges
 ///  * [RoundedRectSliderTrackShape], which is a track shape with round
 ///    stadium-like edges.
-///
-/// The height is set from [SliderThemeData.trackHeight] and the width of the
-/// parent box less the larger of the widths of [SliderThemeData.thumbShape] and
-/// [SliderThemeData.overlayShape].
 abstract class BaseSliderTrackShape {
   /// Returns a rect that represents the track bounds that fits within the
   /// [Slider].
@@ -1481,7 +1498,7 @@ abstract class BaseSliderTrackShape {
 /// [parentBox]. The track rectangle extends to the bounds of the [parentBox],
 /// but is padded by the [RoundSliderOverlayShape] radius. The height is defined
 /// by the [SliderThemeData.trackHeight]. The color is determined by the
-/// [Slider]'s enabled state and the track segments's active state which are
+/// [Slider]'s enabled state and the track segment's active state which are
 /// defined by:
 ///   [SliderThemeData.activeTrackColor],
 ///   [SliderThemeData.inactiveTrackColor],
@@ -1607,16 +1624,16 @@ class RoundedRectSliderTrackShape extends SliderTrackShape with BaseSliderTrackS
 
   @override
   void paint(
-      PaintingContext context,
-      Offset offset, {
-      @required RenderBox parentBox,
-      @required SliderThemeData sliderTheme,
-      @required Animation<double> enableAnimation,
-      @required TextDirection textDirection,
-      @required Offset thumbCenter,
-      bool isDiscrete = false,
-      bool isEnabled = false,
-    }) {
+    PaintingContext context,
+    Offset offset, {
+    @required RenderBox parentBox,
+    @required SliderThemeData sliderTheme,
+    @required Animation<double> enableAnimation,
+    @required TextDirection textDirection,
+    @required Offset thumbCenter,
+    bool isDiscrete = false,
+    bool isEnabled = false,
+  }) {
     assert(context != null);
     assert(offset != null);
     assert(parentBox != null);
@@ -1687,7 +1704,7 @@ class RoundedRectSliderTrackShape extends SliderTrackShape with BaseSliderTrackS
 /// [parentBox]. The track rectangle extends to the bounds of the [parentBox],
 /// but is padded by the [RoundSliderOverlayShape] radius. The height is
 /// defined by the [SliderThemeData.trackHeight]. The color is determined by the
-/// [Slider]'s enabled state and the track segments's active state which are
+/// [Slider]'s enabled state and the track segment's active state which are
 /// defined by:
 ///   [SliderThemeData.activeTrackColor],
 ///   [SliderThemeData.inactiveTrackColor],
@@ -2335,18 +2352,11 @@ class RoundRangeSliderThumbShape extends RangeSliderThumbShape {
           break;
       }
 
-      final Paint strokePaint = Paint()
-        ..color = sliderTheme.overlappingShapeStrokeColor
-        ..strokeWidth = 1.0
-        ..style = PaintingStyle.stroke;
-      if (showValueIndicator && activationAnimation.value > 0) {
-        // If there is a value indicator, then it is already stroked and a gap
-        // needs to be left on the thumb where the value indicator intersects
-        // the thumb.
-        const double startAngle = -math.pi / 2 + 0.2;
-        const double sweepAngle = math.pi * 2 - 0.4;
-        canvas.drawArc(Rect.fromCircle(center: center, radius: radius), startAngle, sweepAngle, false, strokePaint);
-      } else {
+      if (!showValueIndicator || activationAnimation.value == 0) {
+        final Paint strokePaint = Paint()
+          ..color = sliderTheme.overlappingShapeStrokeColor
+          ..strokeWidth = 1.0
+          ..style = PaintingStyle.stroke;
         canvas.drawCircle(center, radius, strokePaint);
       }
     }
@@ -2500,6 +2510,21 @@ class PaddleRangeSliderValueIndicatorShape extends RangeSliderValueIndicatorShap
   }
 
   @override
+  double getHorizontalShift({
+    RenderBox parentBox,
+    Offset center,
+    TextPainter labelPainter,
+    Animation<double> activationAnimation,
+  }) {
+    return _pathPainter.getHorizontalShift(
+      parentBox: parentBox,
+      center: center,
+      labelPainter: labelPainter,
+      scale: activationAnimation.value,
+    );
+  }
+
+  @override
   void paint(
     PaintingContext context,
     Offset center, {
@@ -2553,18 +2578,18 @@ class _PaddleSliderTrackShapePathPainter {
   // was designed to contain. We scale it from here to fit other sizes.
   static const double _labelTextDesignSize = 14.0;
   // Radius of the bottom lobe of the value indicator.
-  static const double _bottomLobeRadius = 6.0;
-  // The starting angle for the bottom lobe. Picked to get the desired
-  // thickness for the neck.
-  static const double _bottomLobeStartAngle = -1.1 * math.pi / 4.0;
-  // The ending angle for the bottom lobe. Picked to get the desired
-  // thickness for the neck.
-  static const double _bottomLobeEndAngle = 1.1 * 5 * math.pi / 4.0;
-  // The padding on either side of the label.
+  static const double _bottomLobeRadius = 10.0;
   static const double _labelPadding = 8.0;
   static const double _distanceBetweenTopBottomCenters = 40.0;
+  static const double _middleNeckWidth = 2.0;
+  static const double _bottomNeckRadius = 4.5;
+  // The base of the triangle between the top lobe center and the centers of
+  // the two top neck arcs.
+  static const double _neckTriangleBase = _topNeckRadius + _middleNeckWidth / 2;
+  static const double _rightBottomNeckCenterX = _middleNeckWidth / 2 + _bottomNeckRadius;
+  static const double _rightBottomNeckAngleStart = math.pi;
   static const Offset _topLobeCenter = Offset(0.0, -_distanceBetweenTopBottomCenters);
-  static const double _topNeckRadius = 14.0;
+  static const double _topNeckRadius = 13.0;
   // The length of the hypotenuse of the triangle formed by the center
   // of the left top lobe arc and the center of the top left neck arc.
   // Used to calculate the position of the center of the arc.
@@ -2580,92 +2605,43 @@ class _PaddleSliderTrackShapePathPainter {
   // be checked in while set to "true".
   static const bool _debuggingLabelLocation = false;
 
-  static Path _bottomLobePath; // Initialized by _generateBottomLobe
-  static Offset _bottomLobeEnd; // Initialized by _generateBottomLobe
-
   Size getPreferredSize(
     bool isEnabled,
     bool isDiscrete,
     TextPainter labelPainter,
   ) {
     assert(labelPainter != null);
-    final double labelHalfWidth = labelPainter.width / 2.0;
-    return Size((labelHalfWidth + _topLobeRadius) * 2, _preferredHeight);
+    final double textScaleFactor = labelPainter.height / _labelTextDesignSize;
+    return Size(labelPainter.width + 2 * _labelPadding * textScaleFactor, _preferredHeight * textScaleFactor);
   }
 
   // Adds an arc to the path that has the attributes passed in. This is
   // a convenience to make adding arcs have less boilerplate.
   static void _addArc(Path path, Offset center, double radius, double startAngle, double endAngle) {
+    assert(center.isFinite);
     final Rect arcRect = Rect.fromCircle(center: center, radius: radius);
     path.arcTo(arcRect, startAngle, endAngle - startAngle, false);
   }
 
-  // Generates the bottom lobe path, which is the same for all instances of
-  // the value indicator, so we reuse it for each one.
-  static void _generateBottomLobe() {
-    const double bottomNeckRadius = 4.5;
-    const double bottomNeckStartAngle = _bottomLobeEndAngle - math.pi;
-    const double bottomNeckEndAngle = 0.0;
-
-    final Path path = Path();
-    final Offset bottomKnobStart = Offset(
-      _bottomLobeRadius * math.cos(_bottomLobeStartAngle),
-      _bottomLobeRadius * math.sin(_bottomLobeStartAngle) - 2,
+  double getHorizontalShift({
+    RenderBox parentBox,
+    Offset center,
+    TextPainter labelPainter,
+    double scale,
+  }) {
+    final double textScaleFactor = labelPainter.height / _labelTextDesignSize;
+    final double inverseTextScale = textScaleFactor != 0 ? 1.0 / textScaleFactor : 0.0;
+    final double labelHalfWidth = labelPainter.width / 2.0;
+    final double halfWidthNeeded = math.max(
+      0.0,
+      inverseTextScale * labelHalfWidth - (_topLobeRadius - _labelPadding),
     );
-    final Offset bottomNeckRightCenter = bottomKnobStart +
-        Offset(
-          bottomNeckRadius * math.cos(bottomNeckStartAngle),
-          -bottomNeckRadius * math.sin(bottomNeckStartAngle),
-        );
-    final Offset bottomNeckLeftCenter = Offset(
-      -bottomNeckRightCenter.dx,
-      bottomNeckRightCenter.dy,
-    );
-    final Offset bottomNeckStartRight = Offset(
-      bottomNeckRightCenter.dx - bottomNeckRadius,
-      bottomNeckRightCenter.dy,
-    );
-    path.moveTo(bottomNeckStartRight.dx, bottomNeckStartRight.dy);
-    _addArc(
-      path,
-      bottomNeckRightCenter,
-      bottomNeckRadius,
-      math.pi - bottomNeckEndAngle,
-      math.pi - bottomNeckStartAngle,
-    );
-    _addArc(
-      path,
-      Offset.zero,
-      _bottomLobeRadius,
-      _bottomLobeStartAngle,
-      _bottomLobeEndAngle,
-    );
-    _addArc(
-      path,
-      bottomNeckLeftCenter,
-      bottomNeckRadius,
-      bottomNeckStartAngle,
-      bottomNeckEndAngle,
-    );
-
-    _bottomLobeEnd = Offset(
-      -bottomNeckStartRight.dx,
-      bottomNeckStartRight.dy,
-    );
-    _bottomLobePath = path;
+    final double shift = _getIdealOffset(parentBox, halfWidthNeeded, textScaleFactor * scale, center);
+    return shift * textScaleFactor;
   }
 
-  Offset _addBottomLobe(Path path) {
-    if (_bottomLobePath == null || _bottomLobeEnd == null) {
-      // Generate this lazily so as to not slow down app startup.
-      _generateBottomLobe();
-    }
-    path.extendWithPath(_bottomLobePath, Offset.zero);
-    return _bottomLobeEnd;
-  }
-
-  // Determines the "best" offset to keep the bubble on the screen. The calling
-  // code will bound that with the available movement in the paddle shape.
+  // Determines the "best" offset to keep the bubble within the slider. The
+  // calling code will bound that with the available movement in the paddle shape.
   double _getIdealOffset(
     RenderBox parentBox,
     double halfWidthNeeded,
@@ -2684,13 +2660,25 @@ class _PaddleSliderTrackShapePathPainter {
     final Offset topLeft = (topLobeRect.topLeft * scale) + center;
     final Offset bottomRight = (topLobeRect.bottomRight * scale) + center;
     double shift = 0.0;
-    if (topLeft.dx < edgeMargin) {
-      shift = edgeMargin - topLeft.dx;
+
+    final double startGlobal = parentBox.localToGlobal(Offset.zero).dx;
+    if (topLeft.dx < startGlobal + edgeMargin) {
+      shift = startGlobal + edgeMargin - topLeft.dx;
     }
-    if (bottomRight.dx > parentBox.size.width - edgeMargin) {
-      shift = parentBox.size.width - bottomRight.dx - edgeMargin;
+
+    final double endGlobal = parentBox.localToGlobal(Offset(parentBox.size.width, parentBox.size.height)).dx;
+    if (bottomRight.dx > endGlobal - edgeMargin) {
+      shift = endGlobal - edgeMargin - bottomRight.dx;
     }
+
     shift = scale == 0.0 ? 0.0 : shift / scale;
+    if (shift < 0.0) {
+      // Shifting to the left.
+      shift = math.max(shift, -halfWidthNeeded);
+    } else {
+      // Shifting to the right.
+      shift = math.min(shift, halfWidthNeeded);
+    }
     return shift;
   }
 
@@ -2703,15 +2691,48 @@ class _PaddleSliderTrackShapePathPainter {
     TextPainter labelPainter,
     Color strokePaintColor,
   ) {
-    canvas.save();
-    canvas.translate(center.dx, center.dy);
+    if (scale == 0.0) {
+      // Zero scale essentially means "do not draw anything", so it's safe to just return. Otherwise,
+      // our math below will attempt to divide by zero and send needless NaNs to the engine.
+      return;
+    }
+
     // The entire value indicator should scale with the size of the label,
     // to keep it large enough to encompass the label text.
     final double textScaleFactor = labelPainter.height / _labelTextDesignSize;
     final double overallScale = scale * textScaleFactor;
-    canvas.scale(overallScale, overallScale);
     final double inverseTextScale = textScaleFactor != 0 ? 1.0 / textScaleFactor : 0.0;
     final double labelHalfWidth = labelPainter.width / 2.0;
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.scale(overallScale, overallScale);
+
+    final double bottomNeckTriangleHypotenuse = _bottomNeckRadius + _bottomLobeRadius / overallScale;
+    final double rightBottomNeckCenterY = -math.sqrt(math.pow(bottomNeckTriangleHypotenuse, 2) - math.pow(_rightBottomNeckCenterX, 2));
+    final double rightBottomNeckAngleEnd = math.pi + math.atan(rightBottomNeckCenterY / _rightBottomNeckCenterX);
+    final Path path = Path()..moveTo(_middleNeckWidth / 2, rightBottomNeckCenterY);
+    _addArc(
+      path,
+      Offset(_rightBottomNeckCenterX, rightBottomNeckCenterY),
+      _bottomNeckRadius,
+      _rightBottomNeckAngleStart,
+      rightBottomNeckAngleEnd,
+    );
+    _addArc(
+      path,
+      Offset.zero,
+      _bottomLobeRadius / overallScale,
+      rightBottomNeckAngleEnd - math.pi,
+      2 * math.pi - rightBottomNeckAngleEnd,
+    );
+    _addArc(
+      path,
+      Offset(-_rightBottomNeckCenterX, rightBottomNeckCenterY),
+      _bottomNeckRadius,
+      math.pi - rightBottomNeckAngleEnd,
+      0,
+    );
 
     // This is the needed extra width for the label.  It is only positive when
     // the label exceeds the minimum size contained by the round top lobe.
@@ -2720,40 +2741,25 @@ class _PaddleSliderTrackShapePathPainter {
       inverseTextScale * labelHalfWidth - (_topLobeRadius - _labelPadding),
     );
 
-    double shift = _getIdealOffset(parentBox, halfWidthNeeded, overallScale, center);
-    double leftWidthNeeded;
-    double rightWidthNeeded;
-    if (shift < 0.0) {
-      // shifting to the left
-      shift = math.max(shift, -halfWidthNeeded);
-    } else {
-      // shifting to the right
-      shift = math.min(shift, halfWidthNeeded);
-    }
-    rightWidthNeeded = halfWidthNeeded + shift;
-    leftWidthNeeded = halfWidthNeeded - shift;
+    final double shift = _getIdealOffset(parentBox, halfWidthNeeded, overallScale, center);
+    final double leftWidthNeeded = halfWidthNeeded - shift;
+    final double rightWidthNeeded = halfWidthNeeded + shift;
 
-    final Path path = Path();
-    final Offset bottomLobeEnd = _addBottomLobe(path);
-
-    // The base of the triangle between the top lobe center and the centers of
-    // the two top neck arcs.
-    final double neckTriangleBase = _topNeckRadius - bottomLobeEnd.dx;
     // The parameter that describes how far along the transition from round to
     // stretched we are.
-    final double leftAmount = math.max(0.0, math.min(1.0, leftWidthNeeded / neckTriangleBase));
-    final double rightAmount = math.max(0.0, math.min(1.0, rightWidthNeeded / neckTriangleBase));
+    final double leftAmount = math.max(0.0, math.min(1.0, leftWidthNeeded / _neckTriangleBase));
+    final double rightAmount = math.max(0.0, math.min(1.0, rightWidthNeeded / _neckTriangleBase));
     // The angle between the top neck arc's center and the top lobe's center
     // and vertical.
     final double leftTheta = (1.0 - leftAmount) * _thirtyDegrees;
     final double rightTheta = (1.0 - rightAmount) * _thirtyDegrees;
     // The center of the top left neck arc.
-    final Offset neckLeftCenter = Offset(
-      -neckTriangleBase,
+    final Offset leftTopNeckCenter = Offset(
+      -_neckTriangleBase,
       _topLobeCenter.dy + math.cos(leftTheta) * _neckTriangleHypotenuse,
     );
     final Offset neckRightCenter = Offset(
-      neckTriangleBase,
+      _neckTriangleBase,
       _topLobeCenter.dy + math.cos(rightTheta) * _neckTriangleHypotenuse,
     );
     final double leftNeckArcAngle = _ninetyDegrees - leftTheta;
@@ -2761,32 +2767,31 @@ class _PaddleSliderTrackShapePathPainter {
     // The distance between the end of the bottom neck arc and the beginning of
     // the top neck arc. We use this to shrink/expand it based on the scale
     // factor of the value indicator.
-    final double neckStretchBaseline = math.max(0.0, bottomLobeEnd.dy - math.max(neckLeftCenter.dy, neckRightCenter.dy));
-    final double t = math.pow(inverseTextScale, 3.0);
-    final double stretch = (neckStretchBaseline * t).clamp(0.0, 10.0 * neckStretchBaseline);
+    final double neckStretchBaseline = math.max(0.0, rightBottomNeckCenterY - math.max(leftTopNeckCenter.dy, neckRightCenter.dy));
+    final double t = math.pow(inverseTextScale, 3.0) as double;
+    final double stretch = (neckStretchBaseline * t).clamp(0.0, 10.0 * neckStretchBaseline) as double;
     final Offset neckStretch = Offset(0.0, neckStretchBaseline - stretch);
 
-    assert(!_debuggingLabelLocation ||
-        () {
-          final Offset leftCenter = _topLobeCenter - Offset(leftWidthNeeded, 0.0) + neckStretch;
-          final Offset rightCenter = _topLobeCenter + Offset(rightWidthNeeded, 0.0) + neckStretch;
-          final Rect valueRect = Rect.fromLTRB(
-            leftCenter.dx - _topLobeRadius,
-            leftCenter.dy - _topLobeRadius,
-            rightCenter.dx + _topLobeRadius,
-            rightCenter.dy + _topLobeRadius,
-          );
-          final Paint outlinePaint = Paint()
-            ..color = const Color(0xffff0000)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.0;
-          canvas.drawRect(valueRect, outlinePaint);
-          return true;
-        }());
+    assert(!_debuggingLabelLocation || () {
+      final Offset leftCenter = _topLobeCenter - Offset(leftWidthNeeded, 0.0) + neckStretch;
+      final Offset rightCenter = _topLobeCenter + Offset(rightWidthNeeded, 0.0) + neckStretch;
+      final Rect valueRect = Rect.fromLTRB(
+        leftCenter.dx - _topLobeRadius,
+        leftCenter.dy - _topLobeRadius,
+        rightCenter.dx + _topLobeRadius,
+        rightCenter.dy + _topLobeRadius,
+      );
+      final Paint outlinePaint = Paint()
+        ..color = const Color(0xffff0000)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0;
+      canvas.drawRect(valueRect, outlinePaint);
+      return true;
+    }());
 
     _addArc(
       path,
-      neckLeftCenter + neckStretch,
+      leftTopNeckCenter + neckStretch,
       _topNeckRadius,
       0.0,
       -leftNeckArcAngle,
@@ -2848,13 +2853,13 @@ typedef RangeSemanticFormatterCallback = String Function(RangeValues values);
 ///
 /// Override [RangeSlider.thumbSelector] for custom thumb selection.
 typedef RangeThumbSelector = Thumb Function(
-    TextDirection textDirection,
-    RangeValues values,
-    double tapValue,
-    Size thumbSize,
-    Size trackSize,
-    double dx
-    );
+  TextDirection textDirection,
+  RangeValues values,
+  double tapValue,
+  Size thumbSize,
+  Size trackSize,
+  double dx,
+);
 
 /// Object for representing range slider thumb values.
 ///
@@ -2881,9 +2886,9 @@ class RangeValues {
   bool operator ==(Object other) {
     if (other.runtimeType != runtimeType)
       return false;
-    final RangeValues typedOther = other;
-    return typedOther.start == start
-        && typedOther.end == end;
+    return other is RangeValues
+        && other.start == start
+        && other.end == end;
   }
 
   @override
@@ -2891,7 +2896,7 @@ class RangeValues {
 
   @override
   String toString() {
-    return '$runtimeType($start, $end)';
+    return '${objectRuntimeType(this, 'RangeValues')}($start, $end)';
   }
 }
 
@@ -2920,9 +2925,9 @@ class RangeLabels {
   bool operator ==(Object other) {
     if (other.runtimeType != runtimeType)
       return false;
-    final RangeLabels typedOther = other;
-    return typedOther.start == start
-        && typedOther.end == end;
+    return other is RangeLabels
+        && other.start == start
+        && other.end == end;
   }
 
   @override
@@ -2930,7 +2935,6 @@ class RangeLabels {
 
   @override
   String toString() {
-    return '$runtimeType($start, $end)';
+    return '${objectRuntimeType(this, 'RangeLabels')}($start, $end)';
   }
 }
-

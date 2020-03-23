@@ -24,7 +24,7 @@
   "copyButtonLabel": "COPY",
   "cutButtonLabel": "LEIKKAA",
   "okButtonLabel": "OK",
-  "pasteButtonLabel": "LIITÄ",
+  "pasteButtonLabel": "Sijoita",
   "selectAllButtonLabel": "VALITSE KAIKKI",
   "viewLicensesButtonLabel": "NÄYTÄ KÄYTTÖOIKEUDET",
   "anteMeridiemAbbreviation": "ap",
@@ -51,5 +51,6 @@
   "remainingTextFieldCharacterCountZero": "TBD",
   "remainingTextFieldCharacterCountOne": "1 merkki jäljellä",
   "remainingTextFieldCharacterCountOther": "$remainingCount merkkiä jäljellä",
-  "refreshIndicatorSemanticLabel": "Päivitys"
+  "refreshIndicatorSemanticLabel": "Päivitys",
+  "moreButtonTooltip": "TBD"
 }

@@ -1,4 +1,4 @@
-// Copyright 2018 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -267,13 +267,9 @@ void main() {
 
     await expectLater(
       find.byKey(_painterKey),
-      matchesGoldenFile(
-        'tab_bar_theme.tab_indicator_size_tab.png',
-        version: null,
-      ),
-      skip: !isLinux,
+      matchesGoldenFile('tab_bar_theme.tab_indicator_size_tab.png'),
     );
-  }, skip: isBrowser);
+  });
 
   testWidgets('Tab bar theme overrides tab indicator size (label)', (WidgetTester tester) async {
     const TabBarTheme tabBarTheme = TabBarTheme(indicatorSize: TabBarIndicatorSize.label);
@@ -282,13 +278,9 @@ void main() {
 
     await expectLater(
       find.byKey(_painterKey),
-      matchesGoldenFile(
-        'tab_bar_theme.tab_indicator_size_label.png',
-        version: null,
-      ),
-      skip: !isLinux,
+      matchesGoldenFile('tab_bar_theme.tab_indicator_size_label.png'),
     );
-  }, skip: isBrowser);
+  });
 
   testWidgets('Tab bar theme - custom tab indicator', (WidgetTester tester) async {
     final TabBarTheme tabBarTheme = TabBarTheme(
@@ -302,13 +294,9 @@ void main() {
 
     await expectLater(
       find.byKey(_painterKey),
-      matchesGoldenFile(
-        'tab_bar_theme.custom_tab_indicator.png',
-        version: null,
-      ),
-      skip: !isLinux,
+      matchesGoldenFile('tab_bar_theme.custom_tab_indicator.png'),
     );
-  }, skip: isBrowser);
+  });
 
   testWidgets('Tab bar theme - beveled rect indicator', (WidgetTester tester) async {
     final TabBarTheme tabBarTheme = TabBarTheme(
@@ -322,11 +310,7 @@ void main() {
 
     await expectLater(
       find.byKey(_painterKey),
-      matchesGoldenFile(
-        'tab_bar_theme.beveled_rect_indicator.png',
-        version: null,
-      ),
-      skip: !isLinux,
+      matchesGoldenFile('tab_bar_theme.beveled_rect_indicator.png'),
     );
-  }, skip: isBrowser);
+  });
 }

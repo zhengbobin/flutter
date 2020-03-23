@@ -1,6 +1,7 @@
-// Copyright 2015 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
@@ -81,7 +82,7 @@ class ExpandIcon extends StatefulWidget {
   ///
   /// Defaults to [Colors.black38] when the theme's
   /// [ThemeData.brightness] is [Brightness.light] and to
-  /// [Colors.white30] when it is [Brightness.dark]. This adheres to the
+  /// [Colors.white38] when it is [Brightness.dark]. This adheres to the
   /// Material Design specifications for [icons](https://material.io/design/iconography/system-icons.html#color)
   /// and for [dark theme](https://material.io/design/color/dark-theme.html#ui-application)
   final Color disabledColor;
@@ -176,6 +177,7 @@ class _ExpandIconState extends State<ExpandIcon> with SingleTickerProviderStateM
       onTapHint: widget.onPressed == null ? null : onTapHint,
       child: IconButton(
         padding: widget.padding,
+        iconSize: widget.size,
         color: _iconColor,
         disabledColor: widget.disabledColor,
         onPressed: widget.onPressed == null ? null : _handlePressed,

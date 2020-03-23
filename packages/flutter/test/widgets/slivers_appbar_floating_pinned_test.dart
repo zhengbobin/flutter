@@ -1,4 +1,4 @@
-// Copyright 2017 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -9,6 +9,43 @@ import 'package:flutter/material.dart';
 import 'semantics_tester.dart';
 
 void main() {
+  testWidgets('Sliver appBars - floating and pinned - correct elevation', (WidgetTester tester) async {
+    await tester.pumpWidget(Localizations(
+        locale: const Locale('en', 'us'),
+        delegates: const <LocalizationsDelegate<dynamic>>[
+          DefaultWidgetsLocalizations.delegate,
+          DefaultMaterialLocalizations.delegate,
+        ],
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: MediaQuery(
+            data: const MediaQueryData(),
+            child: CustomScrollView(
+              slivers: <Widget>[
+                const SliverAppBar(
+                  bottom: PreferredSize(
+                    preferredSize: Size.fromHeight(28),
+                    child: Text('Bottom'),
+                  ),
+                  backgroundColor: Colors.green,
+                  floating: true,
+                  primary: false,
+                  automaticallyImplyLeading: false,
+                ),
+                SliverToBoxAdapter(child: Container(color: Colors.yellow, height: 50.0)),
+                SliverToBoxAdapter(child: Container(color: Colors.red, height: 50.0)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final RenderPhysicalModel renderObject = tester.renderObject<RenderPhysicalModel>(find.byType(PhysicalModel));
+    expect(renderObject, isNotNull);
+    expect(renderObject.elevation, 0.0);
+  });
+
   testWidgets('Sliver appbars - floating and pinned - correct semantics', (WidgetTester tester) async {
     await tester.pumpWidget(
       Localizations(
@@ -48,7 +85,6 @@ void main() {
       ),
     );
 
-
     final SemanticsTester semantics = SemanticsTester(tester);
 
     TestSemantics expectedSemantics = TestSemantics.root(
@@ -59,11 +95,11 @@ void main() {
             TestSemantics(
               children: <TestSemantics>[
                 TestSemantics(
-                  thickness: 4,
+                  thickness: 0,
                   children: <TestSemantics>[
                     TestSemantics(
                       label: 'Hello',
-                      elevation: 4,
+                      elevation: 0,
                       flags: <SemanticsFlag>[SemanticsFlag.isHeader, SemanticsFlag.namesRoute],
                       textDirection: TextDirection.ltr,
                     ),
@@ -106,7 +142,7 @@ void main() {
                       flags: <SemanticsFlag>[SemanticsFlag.isHidden],
                     ),
                   ],
-                )
+                ),
               ],
             ),
           ],
@@ -193,7 +229,7 @@ void main() {
                       flags: <SemanticsFlag>[SemanticsFlag.isHidden],
                     ),
                   ],
-                )
+                ),
               ],
             ),
           ],
@@ -262,7 +298,7 @@ void main() {
     // initial position of E was 200 + 56 + cSize.height + cSize.height + 500
     // we've scrolled that up by 600.0, meaning it's at that minus 600 now:
     expect(tester.getTopLeft(find.text('E')), Offset(0.0, 200.0 + 56.0 + cSize.height * 2.0 + 500.0 - 600.0));
-  }, skip: isBrowser);
+  });
 
   testWidgets('Does not crash when there is less than minExtent remainingPaintExtent', (WidgetTester tester) async {
     // Regression test for https://github.com/flutter/flutter/issues/21887.

@@ -1,4 +1,4 @@
-// Copyright 2017 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -10,7 +10,6 @@ import 'dart:typed_data';
 import 'dart:ui' as ui
     show
         ClipOp,
-        EngineLayer,
         Image,
         ImageByteFormat,
         Paragraph,
@@ -53,15 +52,19 @@ class _ProxyLayer extends Layer {
   final Layer _layer;
 
   @override
-  ui.EngineLayer addToScene(ui.SceneBuilder builder, [ Offset layerOffset = Offset.zero ]) {
-    return _layer.addToScene(builder, layerOffset);
+  void addToScene(ui.SceneBuilder builder, [ Offset layerOffset = Offset.zero ]) {
+    _layer.addToScene(builder, layerOffset);
   }
 
   @override
-  S find<S>(Offset regionOffset) => _layer.find(regionOffset);
-
-  @override
-  Iterable<S> findAll<S>(Offset regionOffset) => <S>[];
+  @protected
+  bool findAnnotations<S>(
+    AnnotationResult<S> result,
+    Offset localPosition, {
+    @required bool onlyFirst,
+  }) {
+    return _layer.findAnnotations(result, localPosition, onlyFirst: onlyFirst);
+  }
 }
 
 /// A [Canvas] that multicasts all method calls to a main canvas and a
@@ -314,9 +317,8 @@ Rect _calculateSubtreeBounds(RenderObject object) {
 /// screenshots render to the scene in the local coordinate system of the layer.
 class _ScreenshotContainerLayer extends OffsetLayer {
   @override
-  ui.EngineLayer addToScene(ui.SceneBuilder builder, [ Offset layerOffset = Offset.zero ]) {
+  void addToScene(ui.SceneBuilder builder, [ Offset layerOffset = Offset.zero ]) {
     addChildrenToScene(builder, layerOffset);
-    return null; // this does not have an engine layer.
   }
 }
 
@@ -542,7 +544,7 @@ class _ScreenshotPaintingContext extends PaintingContext {
   }) {
     RenderObject repaintBoundary = renderObject;
     while (repaintBoundary != null && !repaintBoundary.isRepaintBoundary) {
-      repaintBoundary = repaintBoundary.parent;
+      repaintBoundary = repaintBoundary.parent as RenderObject;
     }
     assert(repaintBoundary != null);
     final _ScreenshotData data = _ScreenshotData(target: renderObject);
@@ -556,9 +558,10 @@ class _ScreenshotPaintingContext extends PaintingContext {
       // Painting the existing repaint boundary to the screenshot is sufficient.
       // We don't just take a direct screenshot of the repaint boundary as we
       // want to capture debugPaint information as well.
-      data.containerLayer.append(_ProxyLayer(repaintBoundary.layer));
+      data.containerLayer.append(_ProxyLayer(repaintBoundary.debugLayer));
       data.foundTarget = true;
-      data.screenshotOffset = repaintBoundary.layer.offset;
+      final OffsetLayer offsetLayer = repaintBoundary.debugLayer as OffsetLayer;
+      data.screenshotOffset = offsetLayer.offset;
     } else {
       // Repaint everything under the repaint boundary.
       // We call debugInstrumentRepaintCompositedChild instead of paintChild as
@@ -591,7 +594,7 @@ class _ScreenshotPaintingContext extends PaintingContext {
     // We must build the regular scene before we can build the screenshot
     // scene as building the screenshot scene assumes addToScene has already
     // been called successfully for all layers in the regular scene.
-    repaintBoundary.layer.buildScene(ui.SceneBuilder());
+    repaintBoundary.debugLayer.buildScene(ui.SceneBuilder());
 
     return data.containerLayer.toImage(renderBounds, pixelRatio: pixelRatio);
   }
@@ -700,7 +703,7 @@ class _WidgetInspectorService = Object with WidgetInspectorService;
 ///
 /// All methods returning String values return JSON.
 mixin WidgetInspectorService {
-  /// Ring of cached JSON values to prevent json from being garbage
+  /// Ring of cached JSON values to prevent JSON from being garbage
   /// collected before it can be requested over the Observatory protocol.
   final List<String> _serializeRing = List<String>(20);
   int _serializeRingIndex = 0;
@@ -908,10 +911,12 @@ mixin WidgetInspectorService {
 
   static const String _consoleObjectGroup = 'console-group';
 
+  int _errorsSinceReload = 0;
+
   void _reportError(FlutterErrorDetails details) {
-    postEvent('Flutter.Error', _nodeToJson(
+    final Map<String, Object> errorJson = _nodeToJson(
       details.toDiagnosticsNode(),
-      _SerializationDelegate(
+      InspectorSerializationDelegate(
         groupName: _consoleObjectGroup,
         subtreeDepth: 5,
         includeProperties: true,
@@ -919,7 +924,21 @@ mixin WidgetInspectorService {
         maxDescendentsTruncatableNode: 5,
         service: this,
       ),
-    ));
+    );
+
+    errorJson['errorsSinceReload'] = _errorsSinceReload;
+    _errorsSinceReload += 1;
+
+    postEvent('Flutter.Error', errorJson);
+  }
+
+  /// Resets the count of errors since the last hot reload.
+  ///
+  /// This data is sent to clients as part of the 'Flutter.Error' service
+  /// protocol event. Clients may choose to display errors received after the
+  /// first error differently.
+  void _resetErrorCount() {
+    _errorsSinceReload = 0;
   }
 
   /// Called to register service extensions.
@@ -932,7 +951,10 @@ mixin WidgetInspectorService {
   void initServiceExtensions(_RegisterServiceExtensionCallback registerServiceExtensionCallback) {
     _registerServiceExtensionCallback = registerServiceExtensionCallback;
     assert(!_debugServiceExtensionsRegistered);
-    assert(() { _debugServiceExtensionsRegistered = true; return true; }());
+    assert(() {
+      _debugServiceExtensionsRegistered = true;
+      return true;
+    }());
 
     SchedulerBinding.instance.addPersistentFrameCallback(_onFrameStart);
 
@@ -1074,9 +1096,19 @@ mixin WidgetInspectorService {
       name: 'getRootWidgetSummaryTree',
       callback: _getRootWidgetSummaryTree,
     );
-    _registerServiceExtensionWithArg(
+    registerServiceExtension(
       name: 'getDetailsSubtree',
-      callback: _getDetailsSubtree,
+      callback: (Map<String, String> parameters) async {
+        assert(parameters.containsKey('objectGroup'));
+        final String subtreeDepth = parameters['subtreeDepth'];
+        return <String, Object>{
+          'result': _getDetailsSubtree(
+            parameters['arg'],
+            parameters['objectGroup'],
+            subtreeDepth != null ? int.parse(subtreeDepth) : 2,
+          ),
+        };
+      },
     );
     _registerServiceExtensionWithArg(
       name: 'getSelectedRenderObject',
@@ -1256,10 +1288,10 @@ mixin WidgetInspectorService {
   /// The local project directories are used to distinguish widgets created by
   /// the local project over widgets created from inside the framework.
   @protected
-  void setPubRootDirectories(List<Object> pubRootDirectories) {
-    _pubRootDirectories = pubRootDirectories.map<String>(
-      (Object directory) => Uri.parse(directory).path,
-    ).toList();
+  void setPubRootDirectories(List<String> pubRootDirectories) {
+    _pubRootDirectories = pubRootDirectories
+      .map<String>((String directory) => Uri.parse(directory).path)
+      .toList();
   }
 
   /// Set the [WidgetInspector] selection to the object matching the specified
@@ -1294,7 +1326,7 @@ mixin WidgetInspectorService {
         if (object == selection.current) {
           return false;
         }
-        selection.current = object;
+        selection.current = object as RenderObject;
         developer.inspect(selection.current);
       }
       if (selectionChangedCallback != null) {
@@ -1336,11 +1368,11 @@ mixin WidgetInspectorService {
 
     return path.map<Object>((_DiagnosticsPathNode node) => _pathNodeToJson(
       node,
-      _SerializationDelegate(groupName: groupName, service: this),
+      InspectorSerializationDelegate(groupName: groupName, service: this),
     )).toList();
   }
 
-  Map<String, Object> _pathNodeToJson(_DiagnosticsPathNode pathNode, _SerializationDelegate delegate) {
+  Map<String, Object> _pathNodeToJson(_DiagnosticsPathNode pathNode, InspectorSerializationDelegate delegate) {
     if (pathNode == null)
       return null;
     return <String, Object>{
@@ -1376,14 +1408,14 @@ mixin WidgetInspectorService {
     final List<RenderObject> chain = <RenderObject>[];
     while (renderObject != null) {
       chain.add(renderObject);
-      renderObject = renderObject.parent;
+      renderObject = renderObject.parent as RenderObject;
     }
     return _followDiagnosticableChain(chain.reversed.toList());
   }
 
   Map<String, Object> _nodeToJson(
     DiagnosticsNode node,
-    _SerializationDelegate delegate,
+    InspectorSerializationDelegate delegate,
   ) {
     return node?.toJsonMap(delegate);
   }
@@ -1397,12 +1429,18 @@ mixin WidgetInspectorService {
   }
 
   bool _isLocalCreationLocation(_Location location) {
-    if (_pubRootDirectories == null || location == null || location.file == null) {
+    if (location == null || location.file == null) {
       return false;
     }
-
     final String file = Uri.parse(location.file).path;
-    for (String directory in _pubRootDirectories) {
+
+    // By default check whether the creation location was within package:flutter.
+    if (_pubRootDirectories == null) {
+      // TODO(chunhtai): Make it more robust once
+      // https://github.com/flutter/flutter/issues/32660 is fixed.
+      return !file.contains('packages/flutter/');
+    }
+    for (final String directory in _pubRootDirectories) {
       if (file.startsWith(directory)) {
         return true;
       }
@@ -1437,8 +1475,8 @@ mixin WidgetInspectorService {
   }
 
   List<Map<String, Object>> _nodesToJson(
-    Iterable<DiagnosticsNode> nodes,
-    _SerializationDelegate delegate, {
+    List<DiagnosticsNode> nodes,
+    InspectorSerializationDelegate delegate, {
     @required DiagnosticsNode parent,
   }) {
     return DiagnosticsNode.toJsonList(nodes, parent, delegate);
@@ -1452,8 +1490,8 @@ mixin WidgetInspectorService {
   }
 
   List<Object> _getProperties(String diagnosticsNodeId, String groupName) {
-    final DiagnosticsNode node = toObject(diagnosticsNodeId);
-    return _nodesToJson(node == null ? const <DiagnosticsNode>[] : node.getProperties(), _SerializationDelegate(groupName: groupName, service: this), parent: node);
+    final DiagnosticsNode node = toObject(diagnosticsNodeId) as DiagnosticsNode;
+    return _nodesToJson(node == null ? const <DiagnosticsNode>[] : node.getProperties(), InspectorSerializationDelegate(groupName: groupName, service: this), parent: node);
   }
 
   /// Returns a JSON representation of the children of the [DiagnosticsNode]
@@ -1463,8 +1501,8 @@ mixin WidgetInspectorService {
   }
 
   List<Object> _getChildren(String diagnosticsNodeId, String groupName) {
-    final DiagnosticsNode node = toObject(diagnosticsNodeId);
-    final _SerializationDelegate delegate = _SerializationDelegate(groupName: groupName, service: this);
+    final DiagnosticsNode node = toObject(diagnosticsNodeId) as DiagnosticsNode;
+    final InspectorSerializationDelegate delegate = InspectorSerializationDelegate(groupName: groupName, service: this);
     return _nodesToJson(node == null ? const <DiagnosticsNode>[] : _getChildrenFiltered(node, delegate), delegate, parent: node);
   }
 
@@ -1485,8 +1523,8 @@ mixin WidgetInspectorService {
   }
 
   List<Object> _getChildrenSummaryTree(String diagnosticsNodeId, String groupName) {
-    final DiagnosticsNode node = toObject(diagnosticsNodeId);
-    final _SerializationDelegate delegate = _SerializationDelegate(groupName: groupName, summaryTree: true, service: this);
+    final DiagnosticsNode node = toObject(diagnosticsNodeId) as DiagnosticsNode;
+    final InspectorSerializationDelegate delegate = InspectorSerializationDelegate(groupName: groupName, summaryTree: true, service: this);
     return _nodesToJson(node == null ? const <DiagnosticsNode>[] : _getChildrenFiltered(node, delegate), delegate, parent: node);
   }
 
@@ -1501,9 +1539,9 @@ mixin WidgetInspectorService {
   }
 
   List<Object> _getChildrenDetailsSubtree(String diagnosticsNodeId, String groupName) {
-    final DiagnosticsNode node = toObject(diagnosticsNodeId);
+    final DiagnosticsNode node = toObject(diagnosticsNodeId) as DiagnosticsNode;
     // With this value of minDepth we only expand one extra level of important nodes.
-    final _SerializationDelegate delegate = _SerializationDelegate(groupName: groupName, subtreeDepth: 1, includeProperties: true, service: this);
+    final InspectorSerializationDelegate delegate = InspectorSerializationDelegate(groupName: groupName, subtreeDepth: 1, includeProperties: true, service: this);
     return _nodesToJson(node == null ? const <DiagnosticsNode>[] : _getChildrenFiltered(node, delegate), delegate, parent: node);
   }
 
@@ -1525,17 +1563,17 @@ mixin WidgetInspectorService {
 
   List<DiagnosticsNode> _getChildrenFiltered(
     DiagnosticsNode node,
-    _SerializationDelegate delegate,
+    InspectorSerializationDelegate delegate,
   ) {
     return _filterChildren(node.getChildren(), delegate);
   }
 
   List<DiagnosticsNode> _filterChildren(
     List<DiagnosticsNode> nodes,
-    _SerializationDelegate delegate,
+    InspectorSerializationDelegate delegate,
   ) {
     final List<DiagnosticsNode> children = <DiagnosticsNode>[
-      for (DiagnosticsNode child in nodes)
+      for (final DiagnosticsNode child in nodes)
         if (!delegate.summaryTree || _shouldShowInSummaryTree(child))
           child
         else
@@ -1551,7 +1589,7 @@ mixin WidgetInspectorService {
   }
 
   Map<String, Object> _getRootWidget(String groupName) {
-    return _nodeToJson(WidgetsBinding.instance?.renderViewElement?.toDiagnosticsNode(), _SerializationDelegate(groupName: groupName, service: this));
+    return _nodeToJson(WidgetsBinding.instance?.renderViewElement?.toDiagnosticsNode(), InspectorSerializationDelegate(groupName: groupName, service: this));
   }
 
   /// Returns a JSON representation of the [DiagnosticsNode] for the root
@@ -1563,7 +1601,7 @@ mixin WidgetInspectorService {
   Map<String, Object> _getRootWidgetSummaryTree(String groupName) {
     return _nodeToJson(
       WidgetsBinding.instance?.renderViewElement?.toDiagnosticsNode(),
-      _SerializationDelegate(groupName: groupName, subtreeDepth: 1000000, summaryTree: true, service: this),
+      InspectorSerializationDelegate(groupName: groupName, subtreeDepth: 1000000, summaryTree: true, service: this),
     );
   }
 
@@ -1575,32 +1613,44 @@ mixin WidgetInspectorService {
   }
 
   Map<String, Object> _getRootRenderObject(String groupName) {
-    return _nodeToJson(RendererBinding.instance?.renderView?.toDiagnosticsNode(), _SerializationDelegate(groupName: groupName, service: this));
+    return _nodeToJson(RendererBinding.instance?.renderView?.toDiagnosticsNode(), InspectorSerializationDelegate(groupName: groupName, service: this));
   }
 
   /// Returns a JSON representation of the subtree rooted at the
   /// [DiagnosticsNode] object that `diagnosticsNodeId` references providing
   /// information needed for the details subtree view.
   ///
+  /// The number of levels of the subtree that should be returned is specified
+  /// by the [subtreeDepth] parameter. This value defaults to 2 for backwards
+  /// compatibility.
+  ///
   /// See also:
   ///
   ///  * [getChildrenDetailsSubtree], a method to get children of a node
   ///    in the details subtree.
-  String getDetailsSubtree(String id, String groupName) {
-    return _safeJsonEncode(_getDetailsSubtree( id, groupName));
+  String getDetailsSubtree(
+    String id,
+    String groupName, {
+    int subtreeDepth = 2,
+  }) {
+    return _safeJsonEncode(_getDetailsSubtree( id, groupName, subtreeDepth));
   }
 
-  Map<String, Object> _getDetailsSubtree(String id, String groupName) {
-    final DiagnosticsNode root = toObject(id);
+  Map<String, Object> _getDetailsSubtree(
+    String id,
+    String groupName,
+    int subtreeDepth,
+  ) {
+    final DiagnosticsNode root = toObject(id) as DiagnosticsNode;
     if (root == null) {
       return null;
     }
     return _nodeToJson(
       root,
-      _SerializationDelegate(
+      InspectorSerializationDelegate(
         groupName: groupName,
         summaryTree: false,
-        subtreeDepth: 2,  // TODO(jacobr): make subtreeDepth configurable.
+        subtreeDepth: subtreeDepth,
         includeProperties: true,
         service: this,
       ),
@@ -1612,22 +1662,22 @@ mixin WidgetInspectorService {
   ///
   /// If the currently selected [RenderObject] is identical to the
   /// [RenderObject] referenced by `previousSelectionId` then the previous
-  /// [DiagnosticNode] is reused.
+  /// [DiagnosticsNode] is reused.
   @protected
   String getSelectedRenderObject(String previousSelectionId, String groupName) {
     return _safeJsonEncode(_getSelectedRenderObject(previousSelectionId, groupName));
   }
 
   Map<String, Object> _getSelectedRenderObject(String previousSelectionId, String groupName) {
-    final DiagnosticsNode previousSelection = toObject(previousSelectionId);
+    final DiagnosticsNode previousSelection = toObject(previousSelectionId) as DiagnosticsNode;
     final RenderObject current = selection?.current;
-    return _nodeToJson(current == previousSelection?.value ? previousSelection : current?.toDiagnosticsNode(), _SerializationDelegate(groupName: groupName, service: this));
+    return _nodeToJson(current == previousSelection?.value ? previousSelection : current?.toDiagnosticsNode(), InspectorSerializationDelegate(groupName: groupName, service: this));
   }
 
   /// Returns a [DiagnosticsNode] representing the currently selected [Element].
   ///
   /// If the currently selected [Element] is identical to the [Element]
-  /// referenced by `previousSelectionId` then the previous [DiagnosticNode] is
+  /// referenced by `previousSelectionId` then the previous [DiagnosticsNode] is
   /// reused.
   @protected
   String getSelectedWidget(String previousSelectionId, String groupName) {
@@ -1641,7 +1691,7 @@ mixin WidgetInspectorService {
   /// to be at most [width] pixels wide and [height] pixels tall. The returned
   /// image will never have a scale between logical pixels and the
   /// size of the output image larger than maxPixelRatio.
-  /// [margin] indicates the number of pixels relative to the unscaled size of
+  /// [margin] indicates the number of pixels relative to the un-scaled size of
   /// the [object] to include as a margin to include around the bounds of the
   /// [object] in the screenshot. Including a margin can be useful to capture
   /// areas that are slightly outside of the normal bounds of an object such as
@@ -1658,7 +1708,7 @@ mixin WidgetInspectorService {
     if (object is! Element && object is! RenderObject) {
       return null;
     }
-    final RenderObject renderObject = object is Element ? object.renderObject : object;
+    final RenderObject renderObject = object is Element ? object.renderObject : (object as RenderObject);
     if (renderObject == null || !renderObject.attached) {
       return null;
     }
@@ -1706,9 +1756,9 @@ mixin WidgetInspectorService {
   }
 
   Map<String, Object> _getSelectedWidget(String previousSelectionId, String groupName) {
-    final DiagnosticsNode previousSelection = toObject(previousSelectionId);
+    final DiagnosticsNode previousSelection = toObject(previousSelectionId) as DiagnosticsNode;
     final Element current = selection?.currentElement;
-    return _nodeToJson(current == previousSelection?.value ? previousSelection : current?.toDiagnosticsNode(), _SerializationDelegate(groupName: groupName, service: this));
+    return _nodeToJson(current == previousSelection?.value ? previousSelection : current?.toDiagnosticsNode(), InspectorSerializationDelegate(groupName: groupName, service: this));
   }
 
   /// Returns a [DiagnosticsNode] representing the currently selected [Element]
@@ -1717,7 +1767,7 @@ mixin WidgetInspectorService {
   /// tree.
   ///
   /// If the currently selected [Element] is identical to the [Element]
-  /// referenced by `previousSelectionId` then the previous [DiagnosticNode] is
+  /// referenced by `previousSelectionId` then the previous [DiagnosticsNode] is
   /// reused.
   String getSelectedSummaryWidget(String previousSelectionId, String groupName) {
     return _safeJsonEncode(_getSelectedSummaryWidget(previousSelectionId, groupName));
@@ -1727,11 +1777,11 @@ mixin WidgetInspectorService {
     if (!isWidgetCreationTracked()) {
       return _getSelectedWidget(previousSelectionId, groupName);
     }
-    final DiagnosticsNode previousSelection = toObject(previousSelectionId);
+    final DiagnosticsNode previousSelection = toObject(previousSelectionId) as DiagnosticsNode;
     Element current = selection?.currentElement;
     if (current != null && !_isValueCreatedByLocalProject(current)) {
       Element firstLocal;
-      for (Element candidate in current.debugGetDiagnosticChain()) {
+      for (final Element candidate in current.debugGetDiagnosticChain()) {
         if (_isValueCreatedByLocalProject(candidate)) {
           firstLocal = candidate;
           break;
@@ -1739,7 +1789,7 @@ mixin WidgetInspectorService {
       }
       current = firstLocal;
     }
-    return _nodeToJson(current == previousSelection?.value ? previousSelection : current?.toDiagnosticsNode(), _SerializationDelegate(groupName: groupName, service: this));
+    return _nodeToJson(current == previousSelection?.value ? previousSelection : current?.toDiagnosticsNode(), InspectorSerializationDelegate(groupName: groupName, service: this));
   }
 
   /// Returns whether [Widget] creation locations are available.
@@ -1793,7 +1843,7 @@ mixin WidgetInspectorService {
 
   void _onPaint(RenderObject renderObject) {
     try {
-      final Element element = renderObject.debugCreator?.element;
+      final Element element = renderObject.debugCreator?.element as Element;
       if (element is! RenderObjectElement) {
         // This branch should not hit as long as all RenderObjects were created
         // by Widgets. It is possible there might be some render objects
@@ -1832,6 +1882,7 @@ mixin WidgetInspectorService {
   /// [BindingBase.reassembleApplication].
   void performReassemble() {
     _clearStats();
+    _resetErrorCount();
   }
 }
 
@@ -1907,7 +1958,7 @@ class _ElementLocationStatsTracker {
     if (widget is! _HasCreationLocation) {
       return;
     }
-    final _HasCreationLocation creationLocationSource = widget;
+    final _HasCreationLocation creationLocationSource = widget as _HasCreationLocation;
     final _Location location = creationLocationSource._location;
     final int id = _toLocationId(location);
 
@@ -1952,7 +2003,7 @@ class _ElementLocationStatsTracker {
     // trigger significant additional memory allocations. Avoiding memory
     // allocations is important to minimize the impact this class has on cpu
     // and memory performance of the running app.
-    for (_LocationCount entry in active) {
+    for (final _LocationCount entry in active) {
       entry.reset();
     }
     active.clear();
@@ -1963,7 +2014,7 @@ class _ElementLocationStatsTracker {
   Map<String, dynamic> exportToJson(Duration startTime) {
     final List<int> events = List<int>.filled(active.length * 2, 0);
     int j = 0;
-    for (_LocationCount stat in active) {
+    for (final _LocationCount stat in active) {
       events[j++] = stat.id;
       events[j++] = stat.count;
     }
@@ -1976,7 +2027,7 @@ class _ElementLocationStatsTracker {
     if (newLocations.isNotEmpty) {
       // Add all newly used location ids to the JSON.
       final Map<String, List<int>> locationsJson = <String, List<int>>{};
-      for (_LocationCount entry in newLocations) {
+      for (final _LocationCount entry in newLocations) {
         final _Location location = entry.location;
         final List<int> jsonForFile = locationsJson.putIfAbsent(
           location.file,
@@ -2061,7 +2112,7 @@ class _WidgetInspectorState extends State<WidgetInspector>
 
   final GlobalKey _ignorePointerKey = GlobalKey();
 
-  /// Distance from the edge of of the bounding box for an element to consider
+  /// Distance from the edge of the bounding box for an element to consider
   /// as selecting the edge of the bounding box.
   static const double _edgeHitMargin = 2.0;
 
@@ -2110,7 +2161,7 @@ class _WidgetInspectorState extends State<WidgetInspector>
       if (diagnostics.style == DiagnosticsTreeStyle.offstage ||
           diagnostics.value is! RenderObject)
         continue;
-      final RenderObject child = diagnostics.value;
+      final RenderObject child = diagnostics.value as RenderObject;
       final Rect paintClip = object.describeApproximatePaintClip(child);
       if (paintClip != null && !paintClip.contains(localPosition))
         continue;
@@ -2164,7 +2215,7 @@ class _WidgetInspectorState extends State<WidgetInspector>
     if (!isSelectMode)
       return;
 
-    final RenderIgnorePointer ignorePointer = _ignorePointerKey.currentContext.findRenderObject();
+    final RenderIgnorePointer ignorePointer = _ignorePointerKey.currentContext.findRenderObject() as RenderIgnorePointer;
     final RenderObject userRender = ignorePointer.child;
     final List<RenderObject> selected = hitTest(position, userRender);
 
@@ -2223,30 +2274,29 @@ class _WidgetInspectorState extends State<WidgetInspector>
 
   @override
   Widget build(BuildContext context) {
-    final List<Widget> children = <Widget>[];
-    children.add(GestureDetector(
-      onTap: _handleTap,
-      onPanDown: _handlePanDown,
-      onPanEnd: _handlePanEnd,
-      onPanUpdate: _handlePanUpdate,
-      behavior: HitTestBehavior.opaque,
-      excludeFromSemantics: true,
-      child: IgnorePointer(
-        ignoring: isSelectMode,
-        key: _ignorePointerKey,
-        ignoringSemantics: false,
-        child: widget.child,
+    return Stack(children: <Widget>[
+      GestureDetector(
+        onTap: _handleTap,
+        onPanDown: _handlePanDown,
+        onPanEnd: _handlePanEnd,
+        onPanUpdate: _handlePanUpdate,
+        behavior: HitTestBehavior.opaque,
+        excludeFromSemantics: true,
+        child: IgnorePointer(
+          ignoring: isSelectMode,
+          key: _ignorePointerKey,
+          ignoringSemantics: false,
+          child: widget.child,
+        ),
       ),
-    ));
-    if (!isSelectMode && widget.selectButtonBuilder != null) {
-      children.add(Positioned(
-        left: _kInspectButtonMargin,
-        bottom: _kInspectButtonMargin,
-        child: widget.selectButtonBuilder(context, _handleEnableSelect),
-      ));
-    }
-    children.add(_InspectorOverlay(selection: selection));
-    return Stack(children: children);
+      if (!isSelectMode && widget.selectButtonBuilder != null)
+        Positioned(
+          left: _kInspectButtonMargin,
+          bottom: _kInspectButtonMargin,
+          child: widget.selectButtonBuilder(context, _handleEnableSelect),
+        ),
+      _InspectorOverlay(selection: selection),
+    ]);
   }
 }
 
@@ -2288,7 +2338,7 @@ class InspectorSelection {
   set current(RenderObject value) {
     if (_current != value) {
       _current = value;
-      _currentElement = value.debugCreator.element;
+      _currentElement = value.debugCreator.element as Element;
     }
   }
 
@@ -2309,7 +2359,7 @@ class InspectorSelection {
   void _computeCurrent() {
     if (_index < candidates.length) {
       _current = candidates[index];
-      _currentElement = _current.debugCreator.element;
+      _currentElement = _current.debugCreator.element as Element;
     } else {
       _current = null;
       _currentElement = null;
@@ -2385,11 +2435,12 @@ class _TransformedRect {
   final Matrix4 transform;
 
   @override
-  bool operator ==(dynamic other) {
+  bool operator ==(Object other) {
     if (other.runtimeType != runtimeType)
       return false;
-    final _TransformedRect typedOther = other;
-    return rect == typedOther.rect && transform == typedOther.transform;
+    return other is _TransformedRect
+        && other.rect == rect
+        && other.transform == transform;
   }
 
   @override
@@ -2416,15 +2467,14 @@ class _InspectorOverlayRenderState {
   final TextDirection textDirection;
 
   @override
-  bool operator ==(dynamic other) {
+  bool operator ==(Object other) {
     if (other.runtimeType != runtimeType)
       return false;
-
-    final _InspectorOverlayRenderState typedOther = other;
-    return overlayRect == typedOther.overlayRect
-        && selected == typedOther.selected
-        && listEquals<_TransformedRect>(candidates, typedOther.candidates)
-        && tooltip == typedOther.tooltip;
+    return other is _InspectorOverlayRenderState
+        && other.overlayRect == overlayRect
+        && other.selected == selected
+        && listEquals<_TransformedRect>(other.candidates, candidates)
+        && other.tooltip == tooltip;
   }
 
   @override
@@ -2458,7 +2508,7 @@ class _InspectorOverlayLayer extends Layer {
         ErrorSummary(
           'The inspector should never be used in production mode due to the '
           'negative performance impact.'
-        )
+        ),
       ]);
     }
   }
@@ -2481,13 +2531,13 @@ class _InspectorOverlayLayer extends Layer {
   double _textPainterMaxWidth;
 
   @override
-  ui.EngineLayer addToScene(ui.SceneBuilder builder, [ Offset layerOffset = Offset.zero ]) {
+  void addToScene(ui.SceneBuilder builder, [ Offset layerOffset = Offset.zero ]) {
     if (!selection.active)
-      return null;
+      return;
 
     final RenderObject selected = selection.current;
     final List<_TransformedRect> candidates = <_TransformedRect>[];
-    for (RenderObject candidate in selection.candidates) {
+    for (final RenderObject candidate in selection.candidates) {
       if (candidate == selected || !candidate.attached)
         continue;
       candidates.add(_TransformedRect(candidate));
@@ -2506,7 +2556,6 @@ class _InspectorOverlayLayer extends Layer {
       _picture = _buildPicture(state);
     }
     builder.addPicture(layerOffset, _picture);
-    return null; // this does not have an engine layer.
   }
 
   ui.Picture _buildPicture(_InspectorOverlayRenderState state) {
@@ -2535,7 +2584,7 @@ class _InspectorOverlayLayer extends Layer {
     // Show all other candidate possibly selected elements. This helps selecting
     // render objects by selecting the edge of the bounding box shows all
     // elements the user could toggle the selection between.
-    for (_TransformedRect transformedRect in state.candidates) {
+    for (final _TransformedRect transformedRect in state.candidates) {
       canvas
         ..save()
         ..transform(transformedRect.transform.storage)
@@ -2567,7 +2616,7 @@ class _InspectorOverlayLayer extends Layer {
   ) {
     canvas.save();
     final double maxWidth = size.width - 2 * (_kScreenEdgeMargin + _kTooltipPadding);
-    final TextSpan textSpan = _textPainter?.text;
+    final TextSpan textSpan = _textPainter?.text as TextSpan;
     if (_textPainter == null || textSpan.text != message || _textPainterMaxWidth != maxWidth) {
       _textPainterMaxWidth = maxWidth;
       _textPainter = TextPainter()
@@ -2617,10 +2666,14 @@ class _InspectorOverlayLayer extends Layer {
   }
 
   @override
-  S find<S>(Offset regionOffset) => null;
-
-  @override
-  Iterable<S> findAll<S>(Offset regionOffset) => <S>[];
+  @protected
+  bool findAnnotations<S>(
+    AnnotationResult<S> result,
+    Offset localPosition, {
+    bool onlyFirst,
+  }) {
+    return false;
+  }
 }
 
 const double _kScreenEdgeMargin = 10.0;
@@ -2705,6 +2758,107 @@ class _Location {
   }
 }
 
+bool _isDebugCreator(DiagnosticsNode node) => node is DiagnosticsDebugCreator;
+
+/// Transformer to parse and gather information about [DiagnosticsDebugCreator].
+///
+/// This function will be registered to [FlutterErrorDetails.propertiesTransformers]
+/// in [WidgetsBinding.initInstances].
+Iterable<DiagnosticsNode> transformDebugCreator(Iterable<DiagnosticsNode> properties) sync* {
+  final List<DiagnosticsNode> pending = <DiagnosticsNode>[];
+  bool foundStackTrace = false;
+  for (final DiagnosticsNode node in properties) {
+    if (!foundStackTrace && node is DiagnosticsStackTrace)
+      foundStackTrace = true;
+    if (_isDebugCreator(node)) {
+      yield* _parseDiagnosticsNode(node);
+    } else {
+      if (foundStackTrace) {
+        pending.add(node);
+      } else {
+        yield node;
+      }
+    }
+  }
+  yield* pending;
+}
+
+/// Transform the input [DiagnosticsNode].
+///
+/// Return null if input [DiagnosticsNode] is not applicable.
+Iterable<DiagnosticsNode> _parseDiagnosticsNode(DiagnosticsNode node) {
+  if (!_isDebugCreator(node))
+    return null;
+  final DebugCreator debugCreator = node.value as DebugCreator;
+  final Element element = debugCreator.element;
+  return _describeRelevantUserCode(element);
+}
+
+Iterable<DiagnosticsNode> _describeRelevantUserCode(Element element) {
+  if (!WidgetInspectorService.instance.isWidgetCreationTracked()) {
+    return <DiagnosticsNode>[
+      ErrorDescription(
+        'Widget creation tracking is currently disabled. Enabling '
+        'it enables improved error messages. It can be enabled by passing '
+        '`--track-widget-creation` to `flutter run` or `flutter test`.',
+      ),
+      ErrorSpacer(),
+    ];
+  }
+  final List<DiagnosticsNode> nodes = <DiagnosticsNode>[];
+  bool processElement(Element target) {
+    // TODO(chunhtai): should print out all the widgets that are about to cross
+    // package boundaries.
+    if (_isLocalCreationLocation(target)) {
+      nodes.add(
+        DiagnosticsBlock(
+          name: 'The relevant error-causing widget was',
+          children: <DiagnosticsNode>[
+            ErrorDescription('${target.widget.toStringShort()} ${_describeCreationLocation(target)}'),
+          ],
+        ),
+      );
+      nodes.add(ErrorSpacer());
+      return false;
+    }
+    return true;
+  }
+  if (processElement(element))
+    element.visitAncestorElements(processElement);
+  return nodes;
+}
+
+/// Returns if an object is user created.
+///
+/// This function will only work in debug mode builds when
+/// the `--track-widget-creation` flag is passed to `flutter_tool`. Dart 2.0 is
+/// required as injecting creation locations requires a
+/// [Dart Kernel Transformer](https://github.com/dart-lang/sdk/wiki/Kernel-Documentation).
+///
+/// Currently is local creation locations are only available for
+/// [Widget] and [Element].
+bool _isLocalCreationLocation(Object object) {
+  final _Location location = _getCreationLocation(object);
+  if (location == null)
+    return false;
+  return WidgetInspectorService.instance._isLocalCreationLocation(location);
+}
+
+/// Returns the creation location of an object in String format if one is available.
+///
+/// ex: "file:///path/to/main.dart:4:3"
+///
+/// Creation locations are only available for debug mode builds when
+/// the `--track-widget-creation` flag is passed to `flutter_tool`. Dart 2.0 is
+/// required as injecting creation locations requires a
+/// [Dart Kernel Transformer](https://github.com/dart-lang/sdk/wiki/Kernel-Documentation).
+///
+/// Currently creation locations are only available for [Widget] and [Element].
+String _describeCreationLocation(Object object) {
+  final _Location location = _getCreationLocation(object);
+  return location?.toString();
+}
+
 /// Returns the creation location of an object if one is available.
 ///
 /// Creation locations are only available for debug mode builds when
@@ -2712,7 +2866,7 @@ class _Location {
 /// required as injecting creation locations requires a
 /// [Dart Kernel Transformer](https://github.com/dart-lang/sdk/wiki/Kernel-Documentation).
 ///
-/// Currently creation locations are only available for [Widget] and [Element]
+/// Currently creation locations are only available for [Widget] and [Element].
 _Location _getCreationLocation(Object object) {
   final Object candidate =  object is Element ? object.widget : object;
   return candidate is _HasCreationLocation ? candidate._location : null;
@@ -2735,8 +2889,13 @@ int _toLocationId(_Location location) {
   return id;
 }
 
-class _SerializationDelegate implements DiagnosticsSerializationDelegate {
-  _SerializationDelegate({
+/// A delegate that configures how a hierarchy of [DiagnosticsNode]s are
+/// serialized by the Flutter Inspector.
+@visibleForTesting
+class InspectorSerializationDelegate implements DiagnosticsSerializationDelegate {
+  /// Creates an [InspectorSerializationDelegate] that serialize [DiagnosticsNode]
+  /// for Flutter Inspector service.
+  InspectorSerializationDelegate({
     this.groupName,
     this.summaryTree = false,
     this.maxDescendentsTruncatableNode = -1,
@@ -2744,11 +2903,23 @@ class _SerializationDelegate implements DiagnosticsSerializationDelegate {
     this.subtreeDepth = 1,
     this.includeProperties = false,
     @required this.service,
+    this.addAdditionalPropertiesCallback,
   });
 
+  /// Service used by GUI tools to interact with the [WidgetInspector].
   final WidgetInspectorService service;
+
+  /// Optional `groupName` parameter which indicates that the json should
+  /// contain live object ids.
+  ///
+  /// Object ids returned as part of the json will remain live at least until
+  /// [WidgetInspectorService.disposeGroup()] is called on [groupName].
   final String groupName;
+
+  /// Whether the tree should only include nodes created by the local project.
   final bool summaryTree;
+
+  /// Maximum descendents of [DiagnosticsNode] before truncating.
   final int maxDescendentsTruncatableNode;
 
   @override
@@ -2760,15 +2931,61 @@ class _SerializationDelegate implements DiagnosticsSerializationDelegate {
   @override
   final bool expandPropertyValues;
 
+  /// Callback to add additional experimental serialization properties.
+  ///
+  /// This callback can be used to customize the serialization of DiagnosticsNode
+  /// objects for experimental features in widget inspector clients such as
+  /// [Dart DevTools](https://github.com/flutter/devtools).
+  /// For example, [Dart DevTools](https://github.com/flutter/devtools)
+  /// can evaluate the following expression to register a VM Service API
+  /// with a custom serialization to experiment with visualizing layouts.
+  ///
+  /// The following code samples demonstrates adding the [RenderObject] associated
+  /// with an [Element] to the serialized data for all elements in the tree:
+  ///
+  /// ```dart
+  /// Map<String, Object> getDetailsSubtreeWithRenderObject(
+  ///   String id,
+  ///   String groupName,
+  ///   int subtreeDepth,
+  /// ) {
+  ///   return _nodeToJson(
+  ///     root,
+  ///     InspectorSerializationDelegate(
+  ///       groupName: groupName,
+  ///       summaryTree: false,
+  ///       subtreeDepth: subtreeDepth,
+  ///       includeProperties: true,
+  ///       service: this,
+  ///       addAdditionalPropertiesCallback: (DiagnosticsNode node, _SerializationDelegate delegate) {
+  ///         final Map<String, Object> additionalJson = <String, Object>{};
+  ///         final Object value = node.value;
+  ///         if (value is Element) {
+  ///           final renderObject = value.renderObject;
+  ///           additionalJson['renderObject'] = renderObject?.toDiagnosticsNode()?.toJsonMap(
+  ///             delegate.copyWith(
+  ///               subtreeDepth: 0,
+  ///               includeProperties: true,
+  ///             ),
+  ///           );
+  ///         }
+  ///         return additionalJson;
+  ///       },
+  ///     ),
+  ///  );
+  /// }
+  /// ```
+  final Map<String, Object> Function(DiagnosticsNode, InspectorSerializationDelegate) addAdditionalPropertiesCallback;
+
   final List<DiagnosticsNode> _nodesCreatedByLocalProject = <DiagnosticsNode>[];
 
-  bool get interactive => groupName != null;
+  bool get _interactive => groupName != null;
 
   @override
   Map<String, Object> additionalNodeProperties(DiagnosticsNode node) {
     final Map<String, Object> result = <String, Object>{};
     final Object value = node.value;
-    if (interactive) {
+    if (_interactive) {
       result['objectId'] = service.toId(node, groupName);
       result['valueId'] = service.toId(value, groupName);
     }
@@ -2783,6 +3000,9 @@ class _SerializationDelegate implements DiagnosticsSerializationDelegate {
         _nodesCreatedByLocalProject.add(node);
         result['createdByLocalProject'] = true;
       }
+    }
+    if (addAdditionalPropertiesCallback != null) {
+      result.addAll(addAdditionalPropertiesCallback(node, this) ?? <String, Object>{});
     }
     return result;
   }
@@ -2824,7 +3044,7 @@ class _SerializationDelegate implements DiagnosticsSerializationDelegate {
 
   @override
   DiagnosticsSerializationDelegate copyWith({int subtreeDepth, bool includeProperties}) {
-    return _SerializationDelegate(
+    return InspectorSerializationDelegate(
       groupName: groupName,
       summaryTree: summaryTree,
       maxDescendentsTruncatableNode: maxDescendentsTruncatableNode,
@@ -2832,6 +3052,7 @@ class _SerializationDelegate implements DiagnosticsSerializationDelegate {
       subtreeDepth: subtreeDepth ?? this.subtreeDepth,
       includeProperties: includeProperties ?? this.includeProperties,
       service: service,
+      addAdditionalPropertiesCallback: addAdditionalPropertiesCallback,
     );
   }
 }
